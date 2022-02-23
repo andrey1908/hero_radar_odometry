@@ -34,7 +34,7 @@ find_package(OpenCV 3 REQUIRED)
 
 # boost python
 ENABLE_TESTING()
-INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${Steam_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} /usr/local/include/steam /usr/local/include/eigen3 /usr/local/include/lgmath ${OpenCV_INCLUDE_DIRS})
 
 # single function call version
 PYTHON_ADD_MODULE(steampy steampy.cpp P2P3ErrorEval.cpp)
