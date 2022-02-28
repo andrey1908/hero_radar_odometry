@@ -247,7 +247,7 @@ def calcSequenceErrors(poses_gt, poses_pred):
     Returns:
         err (List[Tuple]) each entry in list is [first_frame, r_err, t_err, length, speed]
     """
-    lengths = [100, 200, 300, 400, 500, 600, 700, 800]
+    lengths = [5, 10, 25, 50, 75, 100, 150, 200]
     err = []
     step_size = 4  # Every second
     # Pre-compute distances from ground truth as reference
