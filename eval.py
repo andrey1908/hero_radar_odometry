@@ -113,7 +113,7 @@ if __name__ == '__main__':
         pickle.dump([T_gt, T_pred, timestamps], open(root + 'odom' + seq_names[0] + '.obj', 'wb'))
         T_icra = None
         if config['dataset'] == 'oxford':
-            if config['compare_yeti']:
+            if config.get('compare_yeti'):
                 T_icra = load_icra21_results('./results/icra21/', seq_names, seq_lens)
         fname = root + seq_names[0] + '.pdf'
         plot_sequences(T_gt, T_pred, [len(T_gt)], returnTensor=False, T_icra=T_icra, savePDF=True, fnames=[fname])
