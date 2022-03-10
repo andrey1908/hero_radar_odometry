@@ -11,5 +11,6 @@ docker run --gpus all --rm -it -d \
     -v $(realpath $(dirname $0))/../:/home/docker_hero \
     -v $(realpath $1):/dataset \
     --shm-size 16G \
-    --ipc=host -p 6006:80 \
+    --net "host" \
+    --privileged \
     hero:latest
