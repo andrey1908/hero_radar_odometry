@@ -136,3 +136,25 @@ if __name__ == '__main__':
                 monitor.writer.add_scalar('val/learning_rate', get_lr(optimizer), monitor.counter)
             if monitor.counter >= config['max_iterations']:
                 break
+
+        with torch.no_grad():
+            model.eval()
+            mname = os.path.join(config['log_dir'], '{}.pt'.format(epoch + 1))
+            print('saving model', mname)
+            torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'counter': monitor.counter,
+                'epoch': epoch + 1,
+                }, mname)
+            model.train()
+
+        with torch.no_grad():
+            model.eval()
+            model.solver.sliding_flag = True
+            valid_metric = monitor.validation()
+            model.solver.sliding_flag = False
+            model.train()
+        scheduler.step(valid_metric)
+        monitor.writer.add_scalar('val/learning_rate', get_lr(optimizer), monitor.counter)
