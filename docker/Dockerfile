@@ -5,7 +5,7 @@
 # See https://docs.docker.com/engine/reference/builder/
 # for more information.
 #
-FROM nvcr.io/nvidia/cuda:10.1-cudnn7-runtime
+FROM nvcr.io/nvidia/cuda:11.3.1-cudnn8-runtime
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -20,7 +20,7 @@ RUN apt-get install gcc g++ vim sudo wget git python3 python3-pip python3-dev li
 # Install pip packages
 RUN pip3 install --upgrade setuptools
 RUN pip3 install --upgrade pip
-RUN pip3 install torch==1.7.1+cu101 torchvision==0.8.2+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip3 install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 RUN pip3 install tensorboard
 RUN pip3 install -Iv tensorboardx==2.1 matplotlib==3.2.2 opencv-python==4.5.1.48
 RUN pip3 install numpy==1.19.4 sklearn Pillow==8.0
