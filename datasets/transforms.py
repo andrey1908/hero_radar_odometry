@@ -67,6 +67,7 @@ def augmentBatch3(batch, config):
     polar = batch['polar'].numpy()
     azimuths = batch['azimuths'].numpy()
     mask = batch['mask'].numpy()
+    radar_resolution = batch['radar_resolution'].numpy()
     azimuth_res = 0.9 * np.pi / 180
     B, C, H, W = data.shape
     T_aug = []
@@ -79,11 +80,11 @@ def augmentBatch3(batch, config):
         rot_azms = int(np.round(rot / azimuth_res))
         rot = rot_azms * azimuth_res
         plr = np.roll(plr, -1 * rot_azms, axis=0)
-        cart = radar_polar_to_cartesian(azm, plr, config['radar_resolution'],
+        cart = radar_polar_to_cartesian(azm, plr, radar_resolution[i],
                                         config['cart_resolution'], config['cart_pixel_width'])  # 1 x H x W
         data[i] = cart[0]
         polar_mask = mean_intensity_mask(plr)
-        msk = radar_polar_to_cartesian(azm, polar_mask, config['radar_resolution'],
+        msk = radar_polar_to_cartesian(azm, polar_mask, radar_resolution[i],
                                         config['cart_resolution'], config['cart_pixel_width']).astype(np.float32)
         mask[i] = msk[0]
         T_aug += [torch.from_numpy(get_transform(0, 0, -rot))]

@@ -80,7 +80,8 @@ class BoreasDataset(OxfordDataset):
     def __init__(self, config, split='train'):
         super().__init__(config, split)
         self.navtech_version = CIR204
-        #self.dataloader = dataloadercpp.DataLoader(self.config['radar_resolution'], self.config['cart_resolution'],
+        self.radar_resolution = 0.0596
+        #self.dataloader = dataloadercpp.DataLoader(self.radar_resolution, self.config['cart_resolution'],
         #                                           self.config['cart_pixel_width'], self.navtech_version)
 
     def get_frames_with_gt(self, frames, gt_path):
@@ -175,7 +176,7 @@ class BoreasDataset(OxfordDataset):
         azimuths = np.expand_dims(azimuths, axis=0)
         timestamps = np.expand_dims(timestamps, axis=0)
         return {'data': data, 'T_21': T_21, 't_ref': t_ref, 'mask': mask,
-                'azimuths': azimuths, 'timestamps': timestamps}
+                'azimuths': azimuths, 'timestamps': timestamps, 'radar_resolution': self.radar_resolution}
 
 def get_dataloaders_boreas(config):
     """Returns the dataloaders for training models in pytorch.

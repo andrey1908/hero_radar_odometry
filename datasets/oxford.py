@@ -91,6 +91,7 @@ class OxfordDataset(Dataset):
             self.seq_idx_range[seq] = [len(self.frames), len(self.frames) + len(seq_frames)]
             self.seq_lens.append(len(seq_frames))
             self.frames.extend(seq_frames)
+        self.radar_resolution = 0.0438
 
     def get_sequences_split(self, sequences, split):
         """Retrieves a list of sequence names depending on train/validation/test split.
@@ -187,10 +188,10 @@ class OxfordDataset(Dataset):
         seq = self.get_seq_from_idx(idx)
         frame = self.data_dir + seq + '/radar/' + self.frames[idx]
         timestamps, azimuths, _, polar = load_radar(frame)
-        data = radar_polar_to_cartesian(azimuths, polar, self.config['radar_resolution'],
+        data = radar_polar_to_cartesian(azimuths, polar, self.radar_resolution,
                                         self.config['cart_resolution'], self.config['cart_pixel_width'])  # 1 x H x W
         polar_mask = mean_intensity_mask(polar)
-        mask = radar_polar_to_cartesian(azimuths, polar_mask, self.config['radar_resolution'],
+        mask = radar_polar_to_cartesian(azimuths, polar_mask, self.radar_resolution,
                                         self.config['cart_resolution'],
                                         self.config['cart_pixel_width']).astype(np.float32)
         # Get ground truth transform between this frame and the next
@@ -205,7 +206,7 @@ class OxfordDataset(Dataset):
         azimuths = np.expand_dims(azimuths, axis=0)
         timestamps = np.expand_dims(timestamps, axis=0)
         return {'data': data, 'T_21': T_21, 't_ref': t_ref, 'mask': mask, 'polar': polar, 'azimuths': azimuths,
-                'timestamps': timestamps}
+                'timestamps': timestamps, 'radar_resolution': self.radar_resolution}
 
 def get_dataloaders(config):
     """Returns the dataloaders for training models in pytorch.
