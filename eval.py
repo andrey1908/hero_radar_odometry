@@ -7,11 +7,12 @@ import torch
 
 from datasets.oxford import get_dataloaders
 from datasets.boreas import get_dataloaders_boreas
+from datasets.radiate import get_dataloaders_radiate
 from networks.under_the_radar import UnderTheRadar
 from networks.hero import HERO
 from utils.utils import computeMedianError, computeKittiMetrics, save_in_yeti_format, get_T_ba, load_icra21_results
 from utils.utils import get_transform2
-from utils.vis import plot_sequences, draw_matches
+from utils.vis import plot_sequences
 
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
@@ -67,6 +68,9 @@ if __name__ == '__main__':
             _, _, test_loader = get_dataloaders(config)
         elif config['dataset'] == 'boreas':
             _, _, test_loader = get_dataloaders_boreas(config)
+        elif config['dataset'] == 'radiate':
+            _, _, test_loader = get_dataloaders_radiate(config)
+
         seq_lens = test_loader.dataset.seq_lens
         print(seq_lens)
         seq_names = test_loader.dataset.sequences
