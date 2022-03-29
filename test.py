@@ -53,8 +53,8 @@ if __name__ == '__main__':
         model.load_state_dict(checkpoint, strict=False)
     model.eval()
 
-    T_pred_ = list()
-    time_used_ = list()
+    T_pred_all = list()
+    time_used_all = list()
     seq_nums = config['test_split']
     for seq_num in seq_nums:
         time_used = []
@@ -75,18 +75,14 @@ if __name__ == '__main__':
         for batchi, batch in enumerate(test_loader):
             ts = time()
             with torch.no_grad():
-                try:
-                    out = model(batch)
-                except RuntimeError as e:
-                    print(e)
-                    continue
+                out = model(batch)
             if config['model'] == 'UnderTheRadar':
                 R_pred_ = out['R'][0].detach().cpu().numpy().squeeze()
                 t_pred_ = out['t'][0].detach().cpu().numpy().squeeze()
                 T_pred.append(get_transform2(R_pred_, t_pred_))
             elif config['model'] == 'HERO':
                 if batchi == len(test_loader) - 1:
-                    for w in range(batch['T_21'].size(0)-1):
+                    for w in range(config['window_size'] - 1):
                         T_pred.append(get_T_ba(out, a=w, b=w+1))
                         timestamps.append(batch['t_ref'][w].numpy().squeeze())
                 else:
@@ -96,9 +92,9 @@ if __name__ == '__main__':
             time_used.append(time() - ts)
             if (batchi + 1) % config['print_rate'] == 0:
                 print('Eval Batch {} / {}: {:.2}s'.format(batchi, len(test_loader), np.mean(time_used[-config['print_rate']:])))
-        T_pred_.extend(T_pred)
-        time_used_.extend(time_used)
+        T_pred_all.extend(T_pred)
+        time_used_all.extend(time_used)
         fname = os.path.join(args.out_folder, seq_names[0] + '.pdf')
         plot_sequences(T_pred, T_pred, [len(T_pred)], returnTensor=False, savePDF=True, fnames=[fname])
 
-    print('time_used: {}'.format(sum(time_used_) / len(time_used_)))
+    print('time_used: {}'.format(sum(time_used_all) / len(time_used_all)))
