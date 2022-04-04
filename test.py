@@ -12,7 +12,7 @@ from networks.under_the_radar import UnderTheRadar
 from networks.hero import HERO
 from utils.utils import get_T_ba
 from utils.utils import get_transform2
-from utils.vis import plot_sequences
+from utils.vis import plot_sequences, draw_radar, draw_mask, draw_masked_radar
 
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
@@ -31,8 +31,12 @@ if __name__ == '__main__':
     torch.set_num_threads(8)
     parser = build_parser()
     args = parser.parse_args()
+    out_folder = args.out_folder
 
-    os.makedirs(args.out_folder, exist_ok=True)
+    os.makedirs(out_folder, exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'radar'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'mask'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'masked_radar_vis'), exist_ok=True)
 
     with open(args.config) as f:
         config = json.load(f)
@@ -74,8 +78,18 @@ if __name__ == '__main__':
         print('Evaluating sequence: {} : {}'.format(seq_num, seq_names[0]))
         for batchi, batch in enumerate(test_loader):
             ts = time()
+
+            if batchi % config['vis_rate'] == 0:
+                radar_img = draw_radar(batch)
+                radar_img.save(os.path.join(out_folder, 'radar/radar_{}.png'.format(batchi)))
+                mask_img = draw_mask(batch)
+                mask_img.save(os.path.join(out_folder, 'mask/mask_{}.png'.format(batchi)))
+                masked_radar_img = draw_masked_radar(batch)
+                masked_radar_img.save(os.path.join(out_folder, 'masked_radar_vis/masked_radar_vis_{}.png'.format(batchi)))
+
             with torch.no_grad():
                 out = model(batch)
+
             if config['model'] == 'UnderTheRadar':
                 R_pred_ = out['R'][0].detach().cpu().numpy().squeeze()
                 t_pred_ = out['t'][0].detach().cpu().numpy().squeeze()
@@ -94,7 +108,7 @@ if __name__ == '__main__':
                 print('Eval Batch {} / {}: {:.2}s'.format(batchi, len(test_loader), np.mean(time_used[-config['print_rate']:])))
         T_pred_all.extend(T_pred)
         time_used_all.extend(time_used)
-        fname = os.path.join(args.out_folder, seq_names[0] + '.pdf')
+        fname = os.path.join(out_folder, seq_names[0] + '.pdf')
         plot_sequences(T_pred, T_pred, [len(T_pred)], returnTensor=False, savePDF=True, fnames=[fname])
 
     print('time_used: {}'.format(sum(time_used_all) / len(time_used_all)))

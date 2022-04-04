@@ -280,3 +280,26 @@ def plot_sequences(T_gt, T_pred, seq_lens, returnTensor=True, T_icra=None, saveP
         else:
             imgs.append(convert_plt_to_img())
     return imgs
+
+def draw_radar(batch):
+    radar = batch['data'][0].squeeze().numpy()
+    plt.imshow(radar, cmap='gray')
+    plt.title('radar')
+    radar_img = convert_plt_to_img()
+    return radar_img
+
+def draw_mask(batch):
+    mask = batch['mask'][0].squeeze().numpy()
+    plt.imshow(mask, cmap='gray')
+    plt.title('mask')
+    mask_img = convert_plt_to_img()
+    return mask_img
+
+def draw_masked_radar(batch):
+    radar = batch['data'][0].squeeze().numpy()
+    mask = batch['mask'][0].squeeze().numpy()
+    masked_radar = radar * mask
+    plt.imshow(masked_radar, cmap='gray')
+    plt.title('masked radar')
+    masked_radar_img = convert_plt_to_img()
+    return masked_radar_img

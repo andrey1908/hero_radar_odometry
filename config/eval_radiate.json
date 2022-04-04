@@ -60,6 +60,7 @@
     "save_rate": 5000,
     "val_rate": 5000,
     "vis_num": 6,
+    "vis_rate": 30,
     "augmentation": {
         "rot_max": 0.26
     },
