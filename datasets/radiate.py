@@ -6,9 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 from datasets.custom_sampler import RandomWindowBatchSampler, SequentialWindowBatchSampler
 
 class RadiateDataset(Dataset):
-
-    """Radiate Dataset"""
-    
     def __init__(self, config, split='train'):
         self.config = config
         self.data_dir = config['data_dir']
@@ -33,16 +30,11 @@ class RadiateDataset(Dataset):
                 curr_frame += 1
         assert len(self.frames) == len(self.stamps)
 
-        self.radiate_cart_resolution = 0.175
+        self.radar_resolution = 0.175
+        self.cart_resolution = self.config['cart_resolution']
+        self.cart_pixel_width = self.config['cart_pixel_width']
 
     def get_sequences_split(self, sequences, split):
-        """Retrieves a list of sequence names depending on train/validation/test split.
-        Args:
-            sequences (List[AnyStr]): list of all the sequences, sorted lexicographically
-            split (List[int]): indices of a specific split (train or val or test) aftering sorting sequences
-        Returns:
-            List[AnyStr]: list of sequences that belong to the specified split
-        """
         self.split = self.config['train_split']
         if split == 'validation':
             self.split = self.config['validation_split']
@@ -51,16 +43,39 @@ class RadiateDataset(Dataset):
         return [seq for i, seq in enumerate(sequences) if i in self.split]
 
     def get_seq_from_idx(self, idx):
-        """Returns the name of the sequence that this idx belongs to.
-        Args:
-            idx (int): frame index in dataset
-        Returns:
-            AnyStr: name of the sequence that this idx belongs to
-        """
         for seq in self.sequences:
             if self.seq_idx_range[seq][0] <= idx and idx < self.seq_idx_range[seq][1]:
                 return seq
         assert(0), 'sequence for idx {} not found in {}'.format(idx, self.seq_idx_range)
+
+    def mean_intensity_polar_mask(self, polar_data):
+        multiplier = 2.0
+        range_bins, num_azimuths = polar_data.shape
+        polar_mask = np.zeros((range_bins, num_azimuths))
+        for i in range(num_azimuths):
+            m = np.mean(polar_data[:, i])
+            polar_mask[:, i] = polar_data[:, i] > multiplier * m
+        return polar_mask.astype(np.float32)
+
+    def polar_to_cartesian(self, polar):
+        width = (self.cart_pixel_width - 1) * self.cart_resolution
+        coords = np.linspace(-width / 2, width / 2, self.cart_pixel_width, dtype=np.float32)
+        Y, X = np.meshgrid(coords, -1 * coords)
+
+        sample_range = np.sqrt(Y * Y + X * X)
+        sample_angle = np.arctan2(Y, X)
+        sample_angle += (sample_angle < 0).astype(np.float32) * 2 * np.pi
+
+        azimuth_step = 2 * np.pi / polar.shape[1]
+        sample_u = sample_angle / azimuth_step - 0.5
+        sample_v = sample_range / self.radar_resolution - 0.5
+
+        polar = np.concatenate((polar[:,-1:], polar, polar[:,:1]), axis=1)
+        sample_u = sample_u + 1
+        sample_v[sample_v < 0] = 0
+
+        polar_to_cart_warp = np.stack((sample_u, sample_v), axis=-1)
+        return np.expand_dims(cv2.remap(polar, polar_to_cart_warp, None, cv2.INTER_LINEAR), axis=0)
 
     def __len__(self):
         return len(self.frames)
@@ -69,24 +84,14 @@ class RadiateDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         seq = self.get_seq_from_idx(idx)
-        frame = os.path.join(self.data_dir, seq, 'Navtech_Cartesian', self.frames[idx])
+        frame = os.path.join(self.data_dir, seq, 'Navtech_Polar', self.frames[idx])
 
-        data = cv2.imread(frame, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.0
-        scale = self.radiate_cart_resolution / self.config['cart_resolution']
-        scaled_size = (int(data.shape[1] * scale), int(data.shape[0] * scale))
-        data = cv2.resize(data, scaled_size, interpolation=cv2.INTER_LINEAR)
-
-        width = self.config['cart_pixel_width']
-        shift_0 = data.shape[0] // 2 - width // 2
-        shift_1 = data.shape[1] // 2 - width // 2
-        if shift_0 < 0 or shift_1 < 0 or shift_0 + width > data.shape[0] or shift_1 + width > data.shape[1]:
-            raise RuntimeError("Can not transform radar image")
-        data = data[shift_0: shift_0 + width, shift_1: shift_1 + width]
-        data = np.expand_dims(data, axis=0)
+        polar_data = cv2.imread(frame, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255.0
+        polar_mask = self.mean_intensity_polar_mask(polar_data)
+        data = self.polar_to_cartesian(polar_data)
+        mask = self.polar_to_cartesian(polar_mask)
 
         t_ref = np.array([self.stamps[idx], -1]).reshape(1, 2)
-
-        mask = (data > np.mean(data)).astype(np.float32)
 
         timestamps = np.arange(self.stamps[idx], self.stamps[idx] + 0.25 * 10**6, 0.25 * 10**6 / 400, dtype=np.int)
         timestamps = np.expand_dims(np.expand_dims(timestamps, axis=0), axis=-1)
