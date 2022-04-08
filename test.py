@@ -12,7 +12,8 @@ from networks.under_the_radar import UnderTheRadar
 from networks.hero import HERO
 from utils.utils import get_T_ba
 from utils.utils import get_transform2
-from utils.vis import plot_sequences, draw_radar, draw_mask, draw_masked_radar
+from utils.vis import plot_sequences, draw_radar, draw_mask, draw_masked_radar, draw_detector_scores, \
+    draw_weight_scores, draw_keypoints, draw_src_tgt_matches
 
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
@@ -37,6 +38,15 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(out_folder, 'radar'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'mask'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'masked_radar_vis'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'detector_scores'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'weight_scores'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_on_mask_all'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores_all'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores_only_masked'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'src_tgt_matches'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'src_tgt_matches_on_detector_scores'), exist_ok=True)
 
     with open(args.config) as f:
         config = json.load(f)
@@ -82,13 +92,49 @@ if __name__ == '__main__':
             if batchi % config['vis_rate'] == 0:
                 radar_img = draw_radar(batch)
                 radar_img.save(os.path.join(out_folder, 'radar/radar_{}.png'.format(batchi)))
+
                 mask_img = draw_mask(batch)
                 mask_img.save(os.path.join(out_folder, 'mask/mask_{}.png'.format(batchi)))
+
                 masked_radar_img = draw_masked_radar(batch)
                 masked_radar_img.save(os.path.join(out_folder, 'masked_radar_vis/masked_radar_vis_{}.png'.format(batchi)))
 
             with torch.no_grad():
                 out = model(batch)
+
+            if batchi % config['vis_rate'] == 0:
+                detector_scores_img = draw_detector_scores(out)
+                detector_scores_img.save(os.path.join(out_folder, 'detector_scores/detector_scores_{}.png'.format(batchi)))
+
+                weight_scores_img = draw_weight_scores(out)
+                weight_scores_img.save(os.path.join(out_folder, 'weight_scores/weight_scores_{}.png'.format(batchi)))
+
+                keypoints_img = draw_keypoints(batch, out, config)
+                keypoints_img.save(os.path.join(out_folder, 'keypoints/keypoints_{}.png'.format(batchi)))
+
+                keypoints_on_mask_all_img = draw_keypoints(batch, out, config, draw_on='mask', filtering='none')
+                keypoints_on_mask_all_img.save(os.path.join(out_folder,
+                    'keypoints_on_mask_all/keypoints_on_mask_all_{}.png'.format(batchi)))
+
+                keypoints_on_detector_scores_all_img = draw_keypoints(batch, out, config, draw_on='detector_scores', filtering='none')
+                keypoints_on_detector_scores_all_img.save(os.path.join(out_folder,
+                    'keypoints_on_detector_scores_all/keypoints_on_detector_scores_all_{}.png'.format(batchi)))
+
+                keypoints_on_detector_scores_only_masked_img = draw_keypoints(batch, out, config, draw_on='detector_scores', filtering='mask')
+                keypoints_on_detector_scores_only_masked_img.save(os.path.join(out_folder,
+                    'keypoints_on_detector_scores_only_masked/keypoints_on_detector_scores_only_masked_{}.png'.format(batchi)))
+
+                keypoints_on_detector_scores_img = draw_keypoints(batch, out, config, draw_on='detector_scores', filtering='mask+logdet')
+                keypoints_on_detector_scores_img.save(os.path.join(out_folder,
+                    'keypoints_on_detector_scores/keypoints_on_detector_scores_{}.png'.format(batchi)))
+
+                src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, filtering='mask+logdet', draw_connections=True)
+                src_tgt_matches_img.save(os.path.join(out_folder,
+                    'src_tgt_matches/src_tgt_matches_img_{}.png'.format(batchi)))
+
+                src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', filtering='mask+logdet', draw_connections=True)
+                src_tgt_matches_img.save(os.path.join(out_folder,
+                    'src_tgt_matches_on_detector_scores/src_tgt_matches_on_detector_scores_img_{}.png'.format(batchi)))
 
             if config['model'] == 'UnderTheRadar':
                 R_pred_ = out['R'][0].detach().cpu().numpy().squeeze()
@@ -108,7 +154,7 @@ if __name__ == '__main__':
                 print('Eval Batch {} / {}: {:.2}s'.format(batchi, len(test_loader), np.mean(time_used[-config['print_rate']:])))
         T_pred_all.extend(T_pred)
         time_used_all.extend(time_used)
-        fname = os.path.join(out_folder, seq_names[0] + '.pdf')
+        fname = os.path.join(out_folder, seq_names[0] + '.png')
         plot_sequences(T_pred, T_pred, [len(T_pred)], returnTensor=False, savePDF=True, fnames=[fname])
 
     print('time_used: {}'.format(sum(time_used_all) / len(time_used_all)))

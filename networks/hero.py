@@ -36,6 +36,7 @@ class HERO(torch.nn.Module):
         detector_scores, weight_scores, desc = self.unet(data)
         keypoint_coords, keypoint_scores, keypoint_desc = self.keypoint(detector_scores, weight_scores, desc)
         pseudo_coords, match_weights, tgt_ids, src_ids = self.softmax_matcher(keypoint_scores, keypoint_desc, desc, keypoint_coords)
+        all_keypoint_coords = keypoint_coords
         keypoint_coords = keypoint_coords[tgt_ids]
 
         pseudo_coords_xy = convert_to_radar_frame(pseudo_coords, self.config)
@@ -51,7 +52,8 @@ class HERO(torch.nn.Module):
             keypoint_coords_xy[:, :, 1] *= -1.0
 
         # binary mask to remove keypoints from 'empty' regions of the input radar scan
-        keypoint_ints = mask_intensity_filter(mask[tgt_ids], self.patch_size, self.patch_mean_thres)
+        all_keypoint_ints = mask_intensity_filter(mask, self.patch_size, self.patch_mean_thres)
+        keypoint_ints = all_keypoint_ints[tgt_ids]
 
         time_tgt = torch.index_select(timestamps, 0, tgt_ids.cpu())
         time_src = torch.index_select(timestamps, 0, src_ids.cpu())
@@ -62,4 +64,6 @@ class HERO(torch.nn.Module):
 
         return {'R': R_tgt_src_pred, 't': t_tgt_src_pred, 'scores': weight_scores, 'tgt': keypoint_coords_xy,
                 'src': pseudo_coords_xy, 'match_weights': match_weights, 'keypoint_ints': keypoint_ints,
-                'detector_scores': detector_scores, 'tgt_rc': keypoint_coords, 'src_rc': pseudo_coords}
+                'detector_scores': detector_scores, 'tgt_rc': keypoint_coords, 'src_rc': pseudo_coords,
+                'tgt_ids': tgt_ids, 'src_ids': src_ids, 'all_keypoint_coords': all_keypoint_coords,
+                'all_keypoint_ints': all_keypoint_ints, 'all_keypoint_weights': keypoint_scores}
