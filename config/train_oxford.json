@@ -1,7 +1,7 @@
 {
     "model": "HERO",
     "dataset": "oxford",
-    "data_dir": "/dataset/OxfordRadarRobotCar/data/",
+    "data_dir": "/data/OxfordRadarRobotCar/data/",
     "log_dir": "/home/docker_hero/log/",
     "gpuid": "cuda:0",
     "cart_resolution": 0.2592,

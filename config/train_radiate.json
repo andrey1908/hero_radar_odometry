@@ -1,7 +1,7 @@
 {
     "model": "HERO",
     "dataset": "radiate",
-    "data_dir": "/dataset/RADIATE/data/",
+    "data_dir": "/data/RADIATE/data/",
     "log_dir": "/home/docker_hero/log/",
     "gpuid": "cuda:0",
     "cart_resolution": 0.2592,
