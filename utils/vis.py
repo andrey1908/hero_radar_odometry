@@ -399,7 +399,7 @@ def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filterin
     src_keypoint_coords = out['src_rc'][pair_i].detach().cpu().numpy()  # N x 2
     tgt_keypoint_coords = out['tgt_rc'][pair_i].detach().cpu().numpy()  # N x 2
 
-    _, axs = plt.subplots(1, 2, figsize=(16, 8), tight_layout=True)
+    fig, axs = plt.subplots(1, 2, figsize=(16, 8), tight_layout=True)
     keypoint_ids = list()
     draw_keypoints(batch, out, config, i=tgt_i, draw_on=draw_on, filtering=filtering, return_img=False, ax=axs[1],
         keypoint_ids=keypoint_ids)
@@ -411,7 +411,7 @@ def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filterin
         for i in keypoint_ids:
             con = ConnectionPatch(xyA=src_keypoint_coords[i], xyB=tgt_keypoint_coords[i], coordsA='data', coordsB='data',
                 axesA=axs[0], axesB=axs[1], color='red')
-            axs[1].add_artist(con)
+            fig.add_artist(con)
 
     src_tgt_matches_img = convert_plt_to_img()
     return src_tgt_matches_img
