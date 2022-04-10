@@ -1,7 +1,7 @@
 {
     "model": "HERO",
-    "dataset": "",
-    "data_dir": "",
+    "dataset": "oxford",
+    "data_dir": "/data/OxfordRadarRobotCar/data/",
     "log_dir": "/home/docker_hero/log/",
     "gpuid": "cuda:0",
     "cart_resolution": 0.2592,
@@ -36,10 +36,10 @@
         "use_ransac": true,
         "ransac_version": 1,
         "use_ctsteam": true,
-        "ex_translation_vs_in_s": [0.0, 0.0, 0.0],
-        "ex_rotation_sv": [1.0, 0.0, 0.0,
-                           0.0, 1.0, 0.0,
-                           0.0, 0.0, 1.0],
+        "ex_translation_vs_in_s": [0.69000437, -0.12, 0.5800007],
+        "ex_rotation_sv": [0.99875026, 0.0, -0.04997917,
+                           0.0,        1.0,  0.0,
+                           0.04997917, 0.0,  0.99875026],
         "zero_vel_prior": false,
         "vel_prior": false
     },
@@ -60,6 +60,7 @@
     "save_rate": 5000,
     "val_rate": 5000,
     "vis_num": 6,
+    "vis_rate": 500,
     "augmentation": {
         "rot_max": 0.26
     },
