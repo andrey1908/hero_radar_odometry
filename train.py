@@ -88,6 +88,8 @@ if __name__ == '__main__':
                     batch = augmentBatch3(batch, config)
                 elif config['dataset'] == 'oxford' and config['model'] == 'UnderTheRadar':
                     batch = augmentBatch(batch, config)
+                elif config['dataset'] == 'radiate':
+                    train_loader.dataset.augment_batch(batch)
             optimizer.zero_grad()
             try:
                 out = model(batch)

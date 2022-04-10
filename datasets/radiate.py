@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 from torch.utils.data import Dataset, DataLoader
 from datasets.custom_sampler import RandomWindowBatchSampler, SequentialWindowBatchSampler
+from utils.utils import get_transform
 
 class RadiateDataset(Dataset):
     def __init__(self, config, split='train'):
@@ -77,6 +78,39 @@ class RadiateDataset(Dataset):
         polar_to_cart_warp = np.stack((sample_u, sample_v), axis=-1)
         return np.expand_dims(cv2.remap(polar, polar_to_cart_warp, None, cv2.INTER_LINEAR), axis=0)
 
+    def augment_batch(self, batch):
+        rot_max = self.config['augmentation']['rot_max']
+        data_batch = batch['data'].numpy()
+        mask_batch = batch['mask'].numpy()
+        polar_batch = batch['polar'].numpy()
+
+        BW, _, n_azimuth = polar_batch.shape
+        azimuth_resolution = 2 * np.pi / n_azimuth
+        T_aug = list()
+        for i in range(BW):
+            if i % self.config['window_size'] == 0:
+                continue
+            # only for target frames
+            polar_data = polar_batch[i].squeeze()
+            rot = np.random.uniform(-rot_max, rot_max)
+            rot_azimuths = int(np.round(rot / azimuth_resolution))
+            rot = rot_azimuths * azimuth_resolution
+
+            polar_data = np.roll(polar_data, rot_azimuths, axis=1)
+            polar_mask = self.mean_intensity_polar_mask(polar_data)
+            data = self.polar_to_cartesian(polar_data)
+            mask = self.polar_to_cartesian(polar_mask)
+
+            data_batch[i] = data
+            mask_batch[i] = mask
+            T_aug += [torch.from_numpy(get_transform(0, 0, rot))]
+            polar_batch[i] = polar_data
+
+        batch['data'] = torch.from_numpy(data_batch)
+        batch['polar'] = torch.from_numpy(polar_batch)
+        batch['mask'] = torch.from_numpy(mask_batch)
+        batch['T_aug'] = T_aug
+
     def __len__(self):
         return len(self.frames)
 
@@ -97,7 +131,7 @@ class RadiateDataset(Dataset):
         timestamps = np.expand_dims(np.expand_dims(timestamps, axis=0), axis=-1)
 
         return {'data': data, 't_ref': t_ref, 'mask': mask,
-                'timestamps': timestamps}
+                'timestamps': timestamps, 'polar': polar_data}
 
 def get_dataloaders_radiate(config):
     """Returns the dataloaders for training models in pytorch.
