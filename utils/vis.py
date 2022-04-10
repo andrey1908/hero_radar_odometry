@@ -345,7 +345,7 @@ def draw_weight_scores(out):
     return weights_img
 
 def draw_keypoints(batch, out, config, i=0, draw_on='radar', filtering='mask+logdet', return_img=True, keypoint_coords=None,
-        ax=None, color='#00FF00', keypoint_ids=None):
+        ax=None, color='#00FF00', keypoint_ids_ret=None):
     if keypoint_coords is None:
         keypoint_coords = out['all_keypoint_coords'][i].detach().cpu().numpy()  # N x 2
     else:
@@ -385,15 +385,15 @@ def draw_keypoints(batch, out, config, i=0, draw_on='radar', filtering='mask+log
         ids = ids1[ids2]
     else:
         raise ValueError("Unknown filtering: '{}'".format(filtering))
-    if keypoint_ids is not None:
-        keypoint_ids[:] = ids
+    if keypoint_ids_ret is not None:
+        keypoint_ids_ret[:] = ids
 
     ax.scatter(keypoint_coords[ids, 0], keypoint_coords[ids, 1], c=color, s=9)
     if return_img:
         keypoints_img = convert_plt_to_img()
         return keypoints_img
 
-def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filtering='mask+logdet', draw_connections=False):
+def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filtering='mask+logdet', draw_connections=True):
     src_i = out['src_ids'][pair_i].detach().cpu().item()
     tgt_i = out['tgt_ids'][pair_i].detach().cpu().item()
     src_keypoint_coords = out['src_rc'][pair_i].detach().cpu().numpy()  # N x 2
@@ -402,7 +402,7 @@ def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filterin
     fig, axs = plt.subplots(1, 2, figsize=(16, 8), tight_layout=True)
     keypoint_ids = list()
     draw_keypoints(batch, out, config, i=tgt_i, draw_on=draw_on, filtering=filtering, return_img=False, ax=axs[1],
-        keypoint_ids=keypoint_ids)
+        keypoint_ids_ret=keypoint_ids)
     draw_keypoints(batch, out, config, i=src_i, draw_on=draw_on, filtering=filtering, return_img=False,
         keypoint_coords=src_keypoint_coords[keypoint_ids], ax=axs[0], color='#FFFF00')
     axs[0].set_title(axs[0].get_title().replace('keypoints', 'pseudo points'))
