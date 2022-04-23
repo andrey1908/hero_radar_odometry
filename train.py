@@ -26,8 +26,8 @@ print(torch.version.cuda)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='config/steam.json', type=str, help='config file path')
-    parser.add_argument('--pretrain', default=None, type=str, help='pretrain checkpoint path')
+    parser.add_argument('--config', required=True, type=str, help='config file path')
+    parser.add_argument('--pretrain', type=str, help='pretrain checkpoint path')
     args = parser.parse_args()
     with open(args.config) as f:
         config = json.load(f)
@@ -45,10 +45,10 @@ if __name__ == '__main__':
         model = HERO(config).to(config['gpuid'])
 
     ckpt_path = None
-    if os.path.isfile(config['log_dir'] + 'latest.pt'):
-        ckpt_path = config['log_dir'] + 'latest.pt'
-    elif args.pretrain is not None:
+    if args.pretrain is not None:
         ckpt_path = args.pretrain
+    elif os.path.isfile(os.path.join(config['log_dir'], 'latest.pt')):
+        ckpt_path = os.path.join(config['log_dir'], 'latest.pt')
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
 
