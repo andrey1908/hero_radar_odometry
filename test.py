@@ -13,7 +13,7 @@ from networks.under_the_radar import UnderTheRadar
 from networks.hero import HERO
 from utils.utils import get_transform2, get_T_ba, computeKittiMetrics, computeMedianError
 from utils.vis import plot_sequences, draw_radar, draw_mask, draw_masked_radar, draw_detector_scores, \
-    draw_weight_scores, draw_keypoints, draw_src_tgt_matches
+    draw_weights, draw_keypoints, draw_src_tgt_matches
 
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.enabled = True
@@ -34,63 +34,81 @@ def makedirs_for_visualization(out_folder):
     os.makedirs(os.path.join(out_folder, 'mask'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'masked_radar_vis'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'detector_scores'), exist_ok=True)
-    os.makedirs(os.path.join(out_folder, 'weight_scores'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'weights'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'keypoints'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_only_masked'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'keypoints_all'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores_only_masked'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'keypoints_on_detector_scores_all'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'src_tgt_matches'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'src_tgt_matches_only_masked'), exist_ok=True)
+    os.makedirs(os.path.join(out_folder, 'src_tgt_matches_all'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'src_tgt_matches_on_detector_scores'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'src_tgt_matches_on_detector_scores_only_masked'), exist_ok=True)
     os.makedirs(os.path.join(out_folder, 'src_tgt_matches_on_detector_scores_all'), exist_ok=True)
 
 
 def visualize(batchi, batch, out, config, out_folder):
-    radar_img = draw_radar(batch)
-    radar_img.save(os.path.join(out_folder, 'radar/radar_{}.png'.format(batchi)))
+    radar_img = draw_radar(batch, i=1)
+    radar_img.save(os.path.join(out_folder, 'radar/radar_{}.png'.format(batchi+1)))
 
-    mask_img = draw_mask(batch)
-    mask_img.save(os.path.join(out_folder, 'mask/mask_{}.png'.format(batchi)))
+    mask_img = draw_mask(batch, i=1)
+    mask_img.save(os.path.join(out_folder, 'mask/mask_{}.png'.format(batchi+1)))
 
-    masked_radar_img = draw_masked_radar(batch)
-    masked_radar_img.save(os.path.join(out_folder, 'masked_radar_vis/masked_radar_vis_{}.png'.format(batchi)))
+    masked_radar_img = draw_masked_radar(batch, i=1)
+    masked_radar_img.save(os.path.join(out_folder, 'masked_radar_vis/masked_radar_vis_{}.png'.format(batchi+1)))
 
-    detector_scores_img = draw_detector_scores(out)
-    detector_scores_img.save(os.path.join(out_folder, 'detector_scores/detector_scores_{}.png'.format(batchi)))
+    detector_scores_img = draw_detector_scores(out, i=1)
+    detector_scores_img.save(os.path.join(out_folder, 'detector_scores/detector_scores_{}.png'.format(batchi+1)))
 
-    weight_scores_img = draw_weight_scores(out)
-    weight_scores_img.save(os.path.join(out_folder, 'weight_scores/weight_scores_{}.png'.format(batchi)))
+    weights_img = draw_weights(out, i=1)
+    weights_img.save(os.path.join(out_folder, 'weights/weights_{}.png'.format(batchi+1)))
 
-    keypoints_img = draw_keypoints(batch, out, config)
-    keypoints_img.save(os.path.join(out_folder, 'keypoints/keypoints_{}.png'.format(batchi)))
+    keypoints_img = draw_keypoints(batch, out, config, i=1, draw_uncertainty_scale=20)
+    keypoints_img.save(os.path.join(out_folder, 'keypoints/keypoints_{}.png'.format(batchi+1)))
 
-    keypoints_on_detector_scores_img = draw_keypoints(batch, out, config, draw_on='detector_scores')
+    keypoints_only_masked_img = draw_keypoints(batch, out, config, i=1, filtering='mask')
+    keypoints_only_masked_img.save(os.path.join(out_folder, 'keypoints_only_masked/keypoints_only_masked_{}.png'.format(batchi+1)))
+
+    keypoints_all_img = draw_keypoints(batch, out, config, i=1, filtering='none')
+    keypoints_all_img.save(os.path.join(out_folder, 'keypoints_all/keypoints_all_{}.png'.format(batchi+1)))
+
+    keypoints_on_detector_scores_img = draw_keypoints(batch, out, config, i=1, draw_on='detector_scores', draw_uncertainty_scale=20)
     keypoints_on_detector_scores_img.save(os.path.join(out_folder,
-        'keypoints_on_detector_scores/keypoints_on_detector_scores_{}.png'.format(batchi)))
+        'keypoints_on_detector_scores/keypoints_on_detector_scores_{}.png'.format(batchi+1)))
 
-    keypoints_on_detector_scores_only_masked_img = draw_keypoints(batch, out, config, draw_on='detector_scores', filtering='mask')
+    keypoints_on_detector_scores_only_masked_img = draw_keypoints(batch, out, config, i=1, draw_on='detector_scores', filtering='mask')
     keypoints_on_detector_scores_only_masked_img.save(os.path.join(out_folder,
-        'keypoints_on_detector_scores_only_masked/keypoints_on_detector_scores_only_masked_{}.png'.format(batchi)))
+        'keypoints_on_detector_scores_only_masked/keypoints_on_detector_scores_only_masked_{}.png'.format(batchi+1)))
 
-    keypoints_on_detector_scores_all_img = draw_keypoints(batch, out, config, draw_on='detector_scores', filtering='none')
+    keypoints_on_detector_scores_all_img = draw_keypoints(batch, out, config, i=1, draw_on='detector_scores', filtering='none')
     keypoints_on_detector_scores_all_img.save(os.path.join(out_folder,
-        'keypoints_on_detector_scores_all/keypoints_on_detector_scores_all_{}.png'.format(batchi)))
+        'keypoints_on_detector_scores_all/keypoints_on_detector_scores_all_{}.png'.format(batchi+1)))
 
-    src_tgt_matches_img = draw_src_tgt_matches(batch, out, config)
+    src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, draw_uncertainty_scale=20)
     src_tgt_matches_img.save(os.path.join(out_folder,
-        'src_tgt_matches/src_tgt_matches_img_{}.png'.format(batchi)))
+        'src_tgt_matches/src_tgt_matches_{}.png'.format(batchi)))
 
-    src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores')
-    src_tgt_matches_img.save(os.path.join(out_folder,
-        'src_tgt_matches_on_detector_scores/src_tgt_matches_on_detector_scores_img_{}.png'.format(batchi)))
+    src_tgt_matches_only_masked_img = draw_src_tgt_matches(batch, out, config, filtering='mask')
+    src_tgt_matches_only_masked_img.save(os.path.join(out_folder,
+        'src_tgt_matches_only_masked/src_tgt_matches_only_masked_{}.png'.format(batchi)))
 
-    src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', filtering='mask')
-    src_tgt_matches_img.save(os.path.join(out_folder,
-        'src_tgt_matches_on_detector_scores_only_masked/src_tgt_matches_on_detector_scores_only_masked_img_{}.png'.format(batchi)))
+    src_tgt_matches_all_img = draw_src_tgt_matches(batch, out, config, filtering='none')
+    src_tgt_matches_all_img.save(os.path.join(out_folder,
+        'src_tgt_matches_all/src_tgt_matches_all_{}.png'.format(batchi)))
 
-    src_tgt_matches_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', filtering='none')
-    src_tgt_matches_img.save(os.path.join(out_folder,
-        'src_tgt_matches_on_detector_scores_all/src_tgt_matches_on_detector_scores_all_img_{}.png'.format(batchi)))
+    src_tgt_matches_on_detector_scores_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', draw_uncertainty_scale=20)
+    src_tgt_matches_on_detector_scores_img.save(os.path.join(out_folder,
+        'src_tgt_matches_on_detector_scores/src_tgt_matches_on_detector_scores_{}.png'.format(batchi)))
+
+    src_tgt_matches_on_detector_scores_only_masked_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', filtering='mask')
+    src_tgt_matches_on_detector_scores_only_masked_img.save(os.path.join(out_folder,
+        'src_tgt_matches_on_detector_scores_only_masked/src_tgt_matches_on_detector_scores_only_masked_{}.png'.format(batchi)))
+
+    src_tgt_matches_on_detector_scores_all_img = draw_src_tgt_matches(batch, out, config, draw_on='detector_scores', filtering='none')
+    src_tgt_matches_on_detector_scores_all_img.save(os.path.join(out_folder,
+        'src_tgt_matches_on_detector_scores_all/src_tgt_matches_on_detector_scores_all_{}.png'.format(batchi)))
 
 
 if __name__ == '__main__':

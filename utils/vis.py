@@ -1,6 +1,6 @@
 import io
 import PIL.Image
-from matplotlib.patches import ConnectionPatch
+from matplotlib.patches import ConnectionPatch, Ellipse
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -283,7 +283,10 @@ def plot_sequences(T_gt, T_pred, seq_lens, returnTensor=True, T_icra=None, saveP
             imgs.append(convert_plt_to_img())
     return imgs
 
-def draw_radar(batch, i=0, return_img=True, ax=None):
+def draw_radar(batch, i=0,
+        # for private use
+        return_img=True, ax=None):
+
     radar = batch['data'][i].squeeze().numpy()
 
     if ax is None:
@@ -295,7 +298,10 @@ def draw_radar(batch, i=0, return_img=True, ax=None):
         radar_img = convert_plt_to_img()
         return radar_img
 
-def draw_mask(batch, i=0, return_img=True, ax=None):
+def draw_mask(batch, i=0,
+        # for private use
+        return_img=True, ax=None):
+
     mask = batch['mask'][i].squeeze().numpy()
 
     if ax is None:
@@ -307,9 +313,9 @@ def draw_mask(batch, i=0, return_img=True, ax=None):
         mask_img = convert_plt_to_img()
         return mask_img
 
-def draw_masked_radar(batch):
-    radar = batch['data'][0].squeeze().numpy()
-    mask = batch['mask'][0].squeeze().numpy()
+def draw_masked_radar(batch, i=0):
+    radar = batch['data'][i].squeeze().numpy()
+    mask = batch['mask'][i].squeeze().numpy()
     masked_radar = radar * mask
 
     _, axs = plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
@@ -318,7 +324,10 @@ def draw_masked_radar(batch):
     masked_radar_img = convert_plt_to_img()
     return masked_radar_img
 
-def draw_detector_scores(out, i=0, return_img=True, ax=None):
+def draw_detector_scores(out, i=0,
+        # for private use
+        return_img=True, ax=None):
+
     detector_scores = out['detector_scores'][i].squeeze().detach().cpu().numpy()
 
     if ax is None:
@@ -330,8 +339,8 @@ def draw_detector_scores(out, i=0, return_img=True, ax=None):
         detector_scores_img = convert_plt_to_img()
         return detector_scores_img
 
-def draw_weight_scores(out):
-    weight_scores = out['scores'][0].detach().permute(1, 2, 0)  # H x W x S
+def draw_weights(out, i=0):
+    weight_scores = out['scores'][i].detach().permute(1, 2, 0)  # H x W x S
     weight_scores_unrolled = weight_scores.view(-1, weight_scores.size(2))  # HW x S
     _, weights_d = convert_to_weight_matrix(weight_scores_unrolled, -1)  # HW x 3
     weights = torch.sum(weights_d[:, 0:2], dim=1)  # HW
@@ -344,12 +353,57 @@ def draw_weight_scores(out):
     weights_img = convert_plt_to_img()
     return weights_img
 
-def draw_keypoints(batch, out, config, i=0, draw_on='radar', filtering='mask+logdet', return_img=True, keypoint_coords=None,
-        ax=None, color='#00FF00', keypoint_ids_ret=None):
+def draw_keypoints(batch, out, config, i=0, draw_on='radar', filtering='mask+logdet', color='#00FF00',
+        uncertainty_color='#FFFF00', draw_uncertainty_scale=-1,
+        # for private use
+        return_img=True, ax=None, keypoint_coords=None, keypoint_ids_ret=None):
+
+    def get_ids(out, i, filtering, keypoint_coords):
+        if filtering == 'none' or filtering == 'custom_points':
+            ids = np.arange(keypoint_coords.shape[0])
+        elif filtering == 'mask':
+            keypoint_ints = out['all_keypoint_ints'][i].squeeze().detach().cpu().numpy()  # N
+            ids = np.nonzero(keypoint_ints)[0]
+        elif filtering == 'mask+logdet':
+            keypoint_ints = out['all_keypoint_ints'][i].squeeze().detach().cpu().numpy()  # N
+            ids1 = np.nonzero(keypoint_ints)[0]
+
+            weight_scores = out['all_keypoint_weights'][i, :, ids1].detach()  # S x N_masked
+            _, weights_d = convert_to_weight_matrix(weight_scores.T, -1)  # N_masked x 3
+            weights = torch.sum(weights_d[:, 0:2], dim=1)  # N_masked
+            ids2 = torch.nonzero(weights > config['steam']['log_det_thres_val'], as_tuple=False).squeeze().detach().cpu().numpy()
+            if ids2.size <= config['steam']['log_det_topk']:
+                _, ids2 = torch.topk(weights, config['steam']['log_det_topk'], largest=True)
+                ids2 = ids2.squeeze().detach().cpu().numpy()
+            ids = ids1[ids2]
+        return ids
+
+    def get_ellipse_parameters(weights_mat, draw_uncertainty_scale):
+        # A*X^2 + B*XY + C*Y^2 + D*X + E*Y + F = 0
+        # D = 0, E = 0
+        A = weights_mat[:, 0, 0]
+        B = weights_mat[:, 0, 1] + weights_mat[:, 1, 0]
+        C = weights_mat[:, 1, 1]
+        F = -draw_uncertainty_scale**2
+
+        p1 = B**2 - 4*A*C
+        p2 = 2*p1*F
+        a = -np.sqrt(p2 * ((A+C) + np.sqrt((A-C)**2 + B**2))) / p1
+        b = -np.sqrt(p2 * ((A+C) - np.sqrt((A-C)**2 + B**2))) / p1
+        angles = np.arctan2(B, A-C) / 2  # angle from x axis to ellipse minor axis anti-clockwise
+
+        return a, b, angles
+
+    if filtering not in ['none', 'mask', 'mask+logdet']:
+        raise ValueError("Unknown filtering: '{}'".format(filtering))
+
     if keypoint_coords is None:
         keypoint_coords = out['all_keypoint_coords'][i].detach().cpu().numpy()  # N x 2
     else:
-        filtering = 'none'
+        filtering = 'custom_points'
+
+    if filtering == 'custom_points' and draw_uncertainty_scale > 0:
+        raise ValueError("Drawing uncertainties should be disabled when using custom (e.g. pseudo) points")
 
     if ax is None:
         _, axs = plt.subplots(1, 1, figsize=(8, 8), tight_layout=True)
@@ -363,37 +417,44 @@ def draw_keypoints(batch, out, config, i=0, draw_on='radar', filtering='mask+log
         draw_mask(batch, i=i, return_img=False, ax=ax)
     else:
         raise ValueError("Unknown value for draw_on: '{}'".format(draw_on))
-    ax.set_title(ax.get_title() + ' with keypoints')
+    ax.set_xlim(ax.get_xlim())
+    ax.set_ylim(ax.get_ylim())
+    filtering_to_points_str = {'none': 'all keypoints',
+                               'mask': 'only masked keypoints',
+                               'mask+logdet': 'keypoints',
+                               'custom_points': 'pseudo points'}
+    ax.set_title(ax.get_title() + ' with {}'.format(filtering_to_points_str[filtering]))
 
-    if filtering == 'none':
-        ids = np.arange(keypoint_coords.shape[0])
-    elif filtering == 'mask':
-        keypoint_ints = out['all_keypoint_ints'][i].squeeze().detach().cpu().numpy()  # N
-        ids = np.nonzero(keypoint_ints)[0]
-    elif filtering == 'mask+logdet':
-        keypoint_ints = out['all_keypoint_ints'][i].squeeze().detach().cpu().numpy()  # N
-        ids1 = np.nonzero(keypoint_ints)[0]
-
-        weight_scores = out['all_keypoint_weights'][i, :, ids1].detach()  # S x N_masked
-        _, weights_d = convert_to_weight_matrix(weight_scores.T, -1)  # N_masked x 3
-        weights = torch.sum(weights_d[:, 0:2], dim=1)  # N_masked
-        ids2 = torch.nonzero(weights > config['steam']['log_det_thres_val'], as_tuple=False).squeeze().detach().cpu().numpy()
-        if ids2.size <= config['steam']['log_det_topk']:
-            _, ids2 = torch.topk(weights, config['steam']['log_det_topk'], largest=True)
-            ids2 = ids2.squeeze().detach().cpu().numpy()
-
-        ids = ids1[ids2]
-    else:
-        raise ValueError("Unknown filtering: '{}'".format(filtering))
+    ids = get_ids(out, i, filtering, keypoint_coords)
     if keypoint_ids_ret is not None:
         keypoint_ids_ret[:] = ids
 
+    if draw_uncertainty_scale > 0:
+        weight_scores = out['all_keypoint_weights'][i, :, ids].detach()
+        weights_mat, _ = convert_to_weight_matrix(weight_scores.T, -1)
+        weights_mat = weights_mat[:, :2, :2].cpu().numpy()
+
+        # a, b, angles = get_ellipse_parameters(weights_mat, draw_uncertainty_scale)
+        w, v = np.linalg.eig(weights_mat)
+        widths = draw_uncertainty_scale / np.sqrt(w[:, 0]) / config['cart_resolution']
+        heights = draw_uncertainty_scale / np.sqrt(w[:, 1]) / config['cart_resolution']
+        angles = np.arctan2(v[:, 0, 0], v[:, 0, 1])
+
+        for x, y, width, height, angle in \
+                zip(keypoint_coords[ids, 0], keypoint_coords[ids, 1], widths, heights, angles):
+            angle = angle * 180 / np.pi
+            ell = Ellipse(xy=(x, y), width=width, height=height, angle=angle, edgecolor=uncertainty_color, fc='None')
+            ax.add_patch(ell)
+        ax.set_title(ax.get_title() + ', uncertainty scale {}'.format(draw_uncertainty_scale))
+
     ax.scatter(keypoint_coords[ids, 0], keypoint_coords[ids, 1], c=color, s=9)
+
     if return_img:
         keypoints_img = convert_plt_to_img()
         return keypoints_img
 
-def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filtering='mask+logdet', draw_connections=True):
+def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filtering='mask+logdet', src_color='#FFFF00', tgt_color='#00FF00',
+        uncertainty_color='#FFFF00', draw_uncertainty_scale=-1, draw_connections=True):
     src_i = out['src_ids'][pair_i].detach().cpu().item()
     tgt_i = out['tgt_ids'][pair_i].detach().cpu().item()
     src_keypoint_coords = out['src_rc'][pair_i].detach().cpu().numpy()  # N x 2
@@ -401,11 +462,13 @@ def draw_src_tgt_matches(batch, out, config, pair_i=0, draw_on='radar', filterin
 
     fig, axs = plt.subplots(1, 2, figsize=(16, 8), tight_layout=True)
     keypoint_ids = list()
-    draw_keypoints(batch, out, config, i=tgt_i, draw_on=draw_on, filtering=filtering, return_img=False, ax=axs[1],
-        keypoint_ids_ret=keypoint_ids)
-    draw_keypoints(batch, out, config, i=src_i, draw_on=draw_on, filtering=filtering, return_img=False,
-        keypoint_coords=src_keypoint_coords[keypoint_ids], ax=axs[0], color='#FFFF00')
-    axs[0].set_title(axs[0].get_title().replace('keypoints', 'pseudo points'))
+    draw_keypoints(batch, out, config, i=tgt_i, draw_on=draw_on, filtering=filtering, color=tgt_color,
+        uncertainty_color=uncertainty_color, draw_uncertainty_scale=draw_uncertainty_scale,
+        return_img=False, ax=axs[1], keypoint_ids_ret=keypoint_ids)
+    draw_keypoints(batch, out, config, i=src_i, draw_on=draw_on, filtering=filtering, color=src_color,
+        return_img=False, ax=axs[0], keypoint_coords=src_keypoint_coords[keypoint_ids])
+    axs[0].set_title('source ' + axs[0].get_title())
+    axs[1].set_title('target ' + axs[1].get_title())
 
     if draw_connections:
         for i in keypoint_ids:
