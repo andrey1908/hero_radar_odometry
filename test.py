@@ -142,6 +142,7 @@ if __name__ == '__main__':
     if failed:
         model.load_state_dict(checkpoint, strict=False)
     model.eval()
+    model.no_throw = True
 
     seq_names = list()
     time_used_all = list()
@@ -175,13 +176,16 @@ if __name__ == '__main__':
         for batchi, batch in enumerate(test_loader):
             ts = time()
 
-            try:
-                with torch.no_grad():
-                    out = model(batch)
-            except:
-                with open(os.path.join(out_folder, 'failed.txt'), 'w') as f:
-                    f.write('{}'.format(batchi))
-                raise
+            with torch.no_grad():
+                out = model(batch)
+
+            if out['exception'] is not None:
+                fail_folder = os.path.join(out_folder, 'failed_{}'.format(batchi))
+                os.makedirs(fail_folder, exist_ok=True)
+                if with_visualization:
+                    makedirs_for_visualization(fail_folder)
+                    visualize(batchi, batch, out, config, fail_folder)
+                raise out['exception']
 
             if with_visualization and batchi % config['vis_rate'] == 0:
                 visualize(batchi, batch, out, config, out_vis_folder)

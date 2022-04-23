@@ -26,6 +26,7 @@ class HERO(torch.nn.Module):
         self.solver = SteamSolver(config)
         self.patch_size = config['networks']['keypoint_block']['patch_size']
         self.patch_mean_thres = config['steam']['patch_mean_thres']
+        self.no_throw = False
 
     def forward(self, batch):
         data = batch['data'].to(self.gpuid)
@@ -59,11 +60,19 @@ class HERO(torch.nn.Module):
         time_src = torch.index_select(timestamps, 0, src_ids.cpu())
         t_ref_tgt = torch.index_select(t_ref, 0, tgt_ids.cpu())
         t_ref_src = torch.index_select(t_ref, 0, src_ids.cpu())
-        R_tgt_src_pred, t_tgt_src_pred = self.solver.optimize(keypoint_coords_xy, pseudo_coords_xy, match_weights,
-                                                              keypoint_ints, time_tgt, time_src, t_ref_tgt, t_ref_src)
+        try:
+            R_tgt_src_pred, t_tgt_src_pred = self.solver.optimize(keypoint_coords_xy, pseudo_coords_xy, match_weights,
+                                                                keypoint_ints, time_tgt, time_src, t_ref_tgt, t_ref_src)
+            exception = None
+        except Exception as e:
+            if not self.no_throw:
+                raise
+            R_tgt_src_pred = None
+            t_tgt_src_pred = None
+            exception = e
 
         return {'R': R_tgt_src_pred, 't': t_tgt_src_pred, 'scores': weight_scores, 'tgt': keypoint_coords_xy,
                 'src': pseudo_coords_xy, 'match_weights': match_weights, 'keypoint_ints': keypoint_ints,
                 'detector_scores': detector_scores, 'tgt_rc': keypoint_coords, 'src_rc': pseudo_coords,
                 'tgt_ids': tgt_ids, 'src_ids': src_ids, 'all_keypoint_coords': all_keypoint_coords,
-                'all_keypoint_ints': all_keypoint_ints, 'all_keypoint_weights': keypoint_scores}
+                'all_keypoint_ints': all_keypoint_ints, 'all_keypoint_weights': keypoint_scores, 'exception': exception}
