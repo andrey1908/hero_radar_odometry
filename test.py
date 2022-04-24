@@ -144,19 +144,14 @@ if __name__ == '__main__':
     model.eval()
     model.no_throw = True
 
-    seq_names = list()
+    seq_name_all = list()
     time_used_all = list()
     T_gt_all = list()
     T_pred_all = list()
-    t_errs = list()
-    r_errs = list()
+    t_err_all = list()
+    r_err_all = list()
     seq_nums = config['test_split']
     for seq_num in seq_nums:
-        time_used = list()
-        T_gt = list()
-        T_pred = list()
-        timestamps = list()
-
         config['test_split'] = [seq_num]
         if config['dataset'] == 'oxford':
             _, _, test_loader = get_dataloaders(config)
@@ -167,6 +162,9 @@ if __name__ == '__main__':
 
         seq_len = test_loader.dataset.seq_lens[0]
         seq_name = test_loader.dataset.sequences[0]
+        time_used = list()
+        T_gt = list()
+        T_pred = list()
         print('Evaluating sequence {} (len {}): {}'.format(seq_num, seq_len, seq_name))
 
         if with_visualization:
@@ -202,13 +200,11 @@ if __name__ == '__main__':
                         if 'T_21' in batch:
                             T_gt.append(batch['T_21'][w].numpy().squeeze())
                         T_pred.append(get_T_ba(out, a=w, b=w+1))
-                        timestamps.append(batch['t_ref'][w].numpy().squeeze())
                 else:
                     w = 0
                     if 'T_21' in batch:
                         T_gt.append(batch['T_21'][w].numpy().squeeze())
                     T_pred.append(get_T_ba(out, a=w, b=w+1))
-                    timestamps.append(batch['t_ref'][w].numpy().squeeze())
 
             time_used.append(time() - ts)
             if (batchi + 1) % config['print_rate'] == 0:
@@ -216,15 +212,15 @@ if __name__ == '__main__':
 
         time_used_all.extend(time_used)
         if len(T_gt) > 0:
-            seq_names.append(seq_name)
+            seq_name_all.append(seq_name)
             T_gt_all.extend(T_gt)
             T_pred_all.extend(T_pred)
             t_err, r_err = computeKittiMetrics(T_gt, T_pred, [len(T_gt)])
             print('SEQ: {} : {}'.format(seq_num, seq_name))
             print('KITTI t_err: {} %'.format(t_err))
             print('KITTI r_err: {} deg/m'.format(r_err))
-            t_errs.append(t_err)
-            r_errs.append(r_err)
+            t_err_all.append(t_err)
+            r_err_all.append(r_err)
         fname = os.path.join(out_folder, seq_name + '.png')
         if len(T_gt) > 0:
             plot_sequences(T_gt, T_pred, [len(T_pred)], returnTensor=False, savePDF=True, fnames=[fname])
@@ -237,14 +233,16 @@ if __name__ == '__main__':
         results = computeMedianError(T_gt_all, T_pred_all)
         print('dt: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(results[0], results[1], results[2], results[3]))
 
-        t_err_mean = np.mean(t_errs)
-        r_err_mean = np.mean(r_errs)
+        t_err_mean = np.mean(t_err_all)
+        r_err_mean = np.mean(r_err_all)
         print('Average KITTI metrics over all test sequences:')
         print('KITTI t_err: {} %'.format(t_err_mean))
         print('KITTI r_err: {} deg/m'.format(r_err_mean))
 
         with open(os.path.join(out_folder, 'metrics.txt'), 'w') as f:
             f.write('sequence name: translation error (%) rotation error (deg/m)\n')
-            for seq_name, t_err, r_err in zip(seq_names, t_errs, r_errs):
+            for seq_name, t_err, r_err in zip(seq_name_all, t_err_all, r_err_all):
                 line = '{}: {} {}\n'.format(seq_name, t_err, r_err)
                 f.write(line)
+            f.write("\n")
+            f.write("mean: {} {}\n".format(t_err_mean, r_err_mean))
