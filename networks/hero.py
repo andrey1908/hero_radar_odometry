@@ -8,6 +8,7 @@ from networks.keypoint import Keypoint
 from networks.softmax_ref_matcher import SoftmaxRefMatcher
 from networks.steam_solver import SteamSolver
 from utils.utils import convert_to_radar_frame, mask_intensity_filter
+from time import time
 
 class HERO(torch.nn.Module):
     """
@@ -27,16 +28,33 @@ class HERO(torch.nn.Module):
         self.patch_size = config['networks']['keypoint_block']['patch_size']
         self.patch_mean_thres = config['steam']['patch_mean_thres']
         self.no_throw = False
+        self.time_used = dict()
+        self.time_used['all'] = list()
+        self.time_used['feature_map_extraction'] = list()
+        self.time_used['keypoint_extraction'] = list()
+        self.time_used['keypoint_matching'] = list()
+        self.time_used['optimization'] = list()
 
     def forward(self, batch):
+        time_all = time()
+
         data = batch['data'].to(self.gpuid)
         mask = batch['mask'].to(self.gpuid)
         timestamps = batch['timestamps']
         t_ref = batch['t_ref']
 
+        time_feature_map_extraction = time()
         detector_scores, weight_scores, desc = self.unet(data)
+        time_feature_map_extraction = time() - time_feature_map_extraction
+
+        time_keypoint_extraction = time()
         keypoint_coords, keypoint_scores, keypoint_desc = self.keypoint(detector_scores, weight_scores, desc)
+        time_keypoint_extraction = time() - time_keypoint_extraction
+
+        time_keypoint_matching = time()
         pseudo_coords, match_weights, tgt_ids, src_ids = self.softmax_matcher(keypoint_scores, keypoint_desc, desc, keypoint_coords)
+        time_keypoint_matching = time() - time_keypoint_matching
+
         all_keypoint_coords = keypoint_coords
         keypoint_coords = keypoint_coords[tgt_ids]
 
@@ -61,8 +79,10 @@ class HERO(torch.nn.Module):
         t_ref_tgt = torch.index_select(t_ref, 0, tgt_ids.cpu())
         t_ref_src = torch.index_select(t_ref, 0, src_ids.cpu())
         try:
+            time_optimization = time()
             R_tgt_src_pred, t_tgt_src_pred = self.solver.optimize(keypoint_coords_xy, pseudo_coords_xy, match_weights,
                                                                 keypoint_ints, time_tgt, time_src, t_ref_tgt, t_ref_src)
+            time_optimization = time() - time_optimization
             exception = None
         except Exception as e:
             if not self.no_throw:
@@ -70,6 +90,15 @@ class HERO(torch.nn.Module):
             R_tgt_src_pred = None
             t_tgt_src_pred = None
             exception = e
+
+        time_all = time() - time_all
+
+        if exception is None:
+            self.time_used['all'].append(time_all)
+            self.time_used['feature_map_extraction'].append(time_feature_map_extraction)
+            self.time_used['keypoint_extraction'].append(time_keypoint_extraction)
+            self.time_used['keypoint_matching'].append(time_keypoint_matching)
+            self.time_used['optimization'].append(time_optimization)
 
         return {'R': R_tgt_src_pred, 't': t_tgt_src_pred, 'scores': weight_scores, 'tgt': keypoint_coords_xy,
                 'src': pseudo_coords_xy, 'match_weights': match_weights, 'keypoint_ints': keypoint_ints,

@@ -111,6 +111,15 @@ def visualize(batchi, batch, out, config, out_folder):
         'src_tgt_matches_on_detector_scores_all/src_tgt_matches_on_detector_scores_all_{}.png'.format(batchi)))
 
 
+def print_used_time(model):
+    print("Time used:")
+    print("  All: {} s".format(np.mean(model.time_used['all'])))
+    print("  Feature map extraction: {} s".format(np.mean(model.time_used['feature_map_extraction'])))
+    print("  Keypoint extraction: {} s".format(np.mean(model.time_used['keypoint_extraction'])))
+    print("  Keypoint matching: {} s".format(np.mean(model.time_used['keypoint_matching'])))
+    print("  Optimization: {} s".format(np.mean(model.time_used['optimization'])))
+
+
 if __name__ == '__main__':
     torch.set_num_threads(8)
     parser = build_parser()
@@ -184,6 +193,7 @@ if __name__ == '__main__':
                 if with_visualization:
                     makedirs_for_visualization(fail_folder)
                     visualize(batchi, batch, out, config, fail_folder)
+                print_used_time(model)
                 raise out['exception']
 
             if with_visualization and batchi % config['vis_rate'] == 0:
@@ -247,3 +257,5 @@ if __name__ == '__main__':
                 f.write(line)
             f.write("\n")
             f.write("mean: {} {}\n".format(t_err_mean, r_err_mean))
+
+    print_used_time(model)
