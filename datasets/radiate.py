@@ -12,10 +12,10 @@ class RadiateDataset(Dataset):
         self.data_dir = config['data_dir']
         sequences = sorted(os.listdir(self.data_dir))
         self.sequences = self.get_sequences_split(sequences, split)
-        self.seq_idx_range = {}
-        self.seq_lens = []
-        self.frames = []
-        self.stamps = []
+        self.seq_idx_range = dict()
+        self.seq_lens = list()
+        self.frames = list()
+        self.stamps = list()
         for seq in self.sequences:
             seq_frames = sorted(os.listdir(os.path.join(self.data_dir, seq, 'Navtech_Cartesian')))
             self.seq_idx_range[seq] = [len(self.frames), len(self.frames) + len(seq_frames)]
