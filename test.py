@@ -171,6 +171,7 @@ if __name__ == '__main__':
             out_vis_folder = os.path.join(out_folder, seq_name)
             makedirs_for_visualization(out_vis_folder)
 
+        model.solver.solver_cpp.resetTraj()
         for batchi, batch in enumerate(test_loader):
             ts = time()
 
