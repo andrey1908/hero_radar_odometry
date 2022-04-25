@@ -41,9 +41,9 @@ def augmentBatch2(batch, config):
     rot_max = config['augmentation']['rot_max']
     data = batch['data'].numpy()    # this seems to return a reference, not a copy
     mask = batch['mask'].numpy()
-    B, C, H, W = data.shape
+    BW, C, H, W = data.shape
     T_aug = []
-    for i in range(B):
+    for i in range(BW):
         if np.mod(i, config['window_size']) == 0:
             continue
         img = data[i].squeeze()
@@ -69,9 +69,9 @@ def augmentBatch3(batch, config):
     mask = batch['mask'].numpy()
     radar_resolution = batch['radar_resolution'].numpy()
     azimuth_res = 0.9 * np.pi / 180
-    B, C, H, W = data.shape
+    BW, C, H, W = data.shape
     T_aug = []
-    for i in range(B):
+    for i in range(BW):
         if np.mod(i, config['window_size']) == 0:
             continue
         plr = polar[i].squeeze()
