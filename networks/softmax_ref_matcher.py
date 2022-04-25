@@ -26,6 +26,7 @@ class SoftmaxRefMatcher(nn.Module):
             keypoint_scores: (b*w,S,N)
             keypoint_desc: (b*w,C,N)
             desc_dense: (b*w,C,H,W)
+            keypoint_coords: (b*w, N, 2)
         Returns:
             pseudo_coords (torch.tensor): (b*(w-1),N,2)
             match_weights (torch.tensor): (b*(w-1),S,N)
