@@ -43,8 +43,7 @@ def unsupervised_loss(out, batch, config, solver):
     src_coords = out['src']                 # (b*(w-1),N,2) src keypoint locations in metric
     tgt_coords = out['tgt']                 # (b*(w-1),N,2) tgt keypoint locations in metric
     match_weights = out['match_weights']    # (b*(w-1),S,N) match weights S=1=scalar, S=3=matrix
-    keypoint_ints = out['keypoint_ints']    # (b*(w-1),1,N) 0==reject, 1==keep
-    BW = keypoint_ints.size(0)
+    BW = len(src_coords)
     window_size = config['window_size']
     batch_size = int(BW / (window_size - 1))
     gpuid = config['gpuid']
@@ -66,16 +65,10 @@ def unsupervised_loss(out, batch, config, solver):
         i = b * (window_size-1)    # first index of window
         # loop for each window frame
         for w in range(i, i + window_size - 1):
-            # filter by zero intensity patches
-            ids = torch.nonzero(keypoint_ints[w, 0] > 0, as_tuple=False).squeeze(1)
-            if ids.size(0) == 0:
-                print('WARNING: filtering by zero intensity patches resulted in zero keypoints!')
-                continue
-
             # points must be list of N x 3
-            points1 = zeropad(src_coords[w, ids]).unsqueeze(-1)    # N x 3 x 1
-            points2 = zeropad(tgt_coords[w, ids]).unsqueeze(-1)    # N x 3 x 1
-            weights_mat, weights_d = convert_to_weight_matrix(match_weights[w, :, ids].T, w, T_aug)
+            points1 = zeropad(src_coords[w]).unsqueeze(-1)    # N x 3 x 1
+            points2 = zeropad(tgt_coords[w]).unsqueeze(-1)    # N x 3 x 1
+            weights_mat, weights_d = convert_to_weight_matrix(match_weights[w].T, w, T_aug)
             ones = torch.ones(weights_mat.shape).to(gpuid)
 
             # get R_21 and t_12_in_2

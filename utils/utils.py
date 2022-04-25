@@ -393,10 +393,9 @@ def normalize_coords(coords_2D, width, height):
     Returns:
         torch.tensor: (b*w,N,2) coordinates normalized to be within [-1,1]
     """
-    batch_size = coords_2D.size(0)
-    u_norm = (2 * coords_2D[:, :, 0].reshape(batch_size, -1) / (width - 1)) - 1
-    v_norm = (2 * coords_2D[:, :, 1].reshape(batch_size, -1) / (height - 1)) - 1
-    return torch.stack([u_norm, v_norm], dim=2)  # BW x num_patches x 2
+    u_norm = (2 * coords_2D[:, 0] / (width - 1)) - 1
+    v_norm = (2 * coords_2D[:, 1] / (height - 1)) - 1
+    return torch.stack([u_norm, v_norm], dim=1)  # BW x num_patches x 2
 
 def convert_to_radar_frame(pixel_coords, config):
     """Converts pixel_coords (B x N x 2) from pixel coordinates to metric coordinates in the radar frame.
@@ -413,10 +412,15 @@ def convert_to_radar_frame(pixel_coords, config):
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution
     else:
         cart_min_range = cart_pixel_width // 2 * cart_resolution
-    B, N, _ = pixel_coords.size()
-    R = torch.tensor([[0, -cart_resolution], [cart_resolution, 0]]).expand(B, 2, 2).to(gpuid)
-    t = torch.tensor([[cart_min_range], [-cart_min_range]]).expand(B, 2, N).to(gpuid)
-    return (torch.bmm(R, pixel_coords.transpose(2, 1)) + t).transpose(2, 1)
+
+    radar_coords = list()
+    for i in range(len(pixel_coords)):
+        N = pixel_coords[i].shape[0]
+        R = torch.tensor([[0, -cart_resolution], [cart_resolution, 0]]).expand(2, 2).to(gpuid)
+        t = torch.tensor([[cart_min_range], [-cart_min_range]]).expand(2, N).to(gpuid)
+        radar_coords.append((torch.matmul(R, pixel_coords[i].transpose(1, 0)) + t).transpose(1, 0))
+
+    return radar_coords
 
 def get_indices(batch_size, window_size):
     """Retrieves batch indices for for source and target frames.

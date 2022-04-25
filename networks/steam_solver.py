@@ -50,7 +50,7 @@ class SteamSolver():
         self.solver_cpp.setVelPriorFlag(config['steam']['vel_prior'])
         self.flip_y = config['flip_y']
 
-    def optimize(self, keypoint_coords, pseudo_coords, match_weights, keypoint_ints, time_tgt, time_src,
+    def optimize(self, keypoint_coords, pseudo_coords, match_weights_mat, time_tgt, time_src,
                  t_ref_tgt, t_ref_src):
         """ Given the matched keypoints locations between the target frames (keypoint_coords) and the
             source frame (pseudo_coords), this module uses STEAM to estimate the most likely transformations and
@@ -58,8 +58,7 @@ class SteamSolver():
         Args:
             keypoint_coords (torch.tensor): (b*(w-1),N,2) target keypoint locations in metric coordinates
             pseudo_coords (torch.tensor): (b*(w-1),N,2) source keypoint locations in metric coordinates
-            match_weights (torch.tensor): (b*(w-1),S,N) weight associated with each src-tgt match S=score_dim (1=scalar, 3=matrix)
-            keypoint_ints (torch.tensor): (b*(w-1),1,N) Some keypoints are masked out during inference, 1 == keep, 0 == reject
+            match_weights_mat (torch.tensor): (b*(w-1),N,3,3) weight matrix associated with each src-tgt match
             time_tgt (torch.tensor): (b*(w-1),400) Timestamps output by the sensor for each azimuth of the polar data
             tim_src (torch.tensor): (b*(w-1),400) Timestamps output by the sensor for each azimuth of the polar data
             t_ref_tgt (torch.tensor): (b*(w-1),1,2) Reference times for each target frame
@@ -70,7 +69,7 @@ class SteamSolver():
             R_tgt_src_pred (torch.tensor): (b, w, 3, 3) predicted rotation from src to tgt, indexed by window (0=identity)
             t_tgt_src_pred (torch.tensor): (b, w, 3, 1) predicted translation
         """
-        BW = keypoint_ints.size(0)
+        BW = len(keypoint_coords)
         B = int(BW / (self.window_size - 1))
         self.poses = np.tile(np.expand_dims(np.expand_dims(np.eye(4, dtype=np.float32), 0), 0),
                              (B, self.window_size, 1, 1))  # B x W x 4 x 4
@@ -86,7 +85,7 @@ class SteamSolver():
         t_src_tgt_in_tgt = np.zeros((B, self.window_size, 3, 1), dtype=np.float32)
         # loop through each batch
         for b in range(B):
-            i = b * (self.window_size-1)    # first index of window
+            i = b * (self.window_size - 1)    # first index of window
             points1 = []
             points2 = []
             times1 = []
@@ -95,27 +94,9 @@ class SteamSolver():
             t_refs = []
             # loop for each window frame
             for w in range(i, i + self.window_size - 1):
-                # filter by zero intensity patches
-                ids = torch.nonzero(keypoint_ints[w, 0] > 0, as_tuple=False).squeeze(1)
-                # points must be list of N x 3
-                points1_temp = pseudo_coords[w, ids].detach().cpu().numpy()
-                points2_temp = keypoint_coords[w, ids].detach().cpu().numpy()
-                # weights must be list of N x 3 x 3
-                weights_temp, weights_d = convert_to_weight_matrix(match_weights[w, :, ids].T, w, self.T_aug)
-                # threshold on log determinant
-                if self.log_det_thres_flag:
-                    ids = torch.nonzero(torch.sum(weights_d[:, 0:2], dim=1) > self.log_det_thres_val,
-                                        as_tuple=False).squeeze().detach().cpu()
-                    if ids.squeeze().nelement() <= self.log_det_topk:
-                        print('Warning: Log det threshold output less than specified top k.')
-                        _, ids = torch.topk(torch.sum(weights_d[:, 0:2], dim=1), self.log_det_topk, largest=True)
-                        ids = ids.squeeze().detach().cpu()
-                else:
-                    ids = np.arange(weights_temp.size(0)).squeeze()
-                # append
-                points1 += [np.pad(points1_temp[ids], pad_width=[(0, 0), (0, 1)])]
-                points2 += [np.pad(points2_temp[ids], pad_width=[(0, 0), (0, 1)])]
-                weights += [weights_temp[ids].detach().cpu().numpy()]
+                points1 += [np.pad(pseudo_coords[w].detach().cpu().numpy(), pad_width=[(0, 0), (0, 1)])]
+                points2 += [np.pad(keypoint_coords[w].detach().cpu().numpy(), pad_width=[(0, 0), (0, 1)])]
+                weights += [match_weights_mat[w].detach().cpu().numpy()]
                 times1 += [time_src[w].cpu().numpy().squeeze()]
                 times2 += [time_tgt[w].cpu().numpy().squeeze()]
                 if w == i:
