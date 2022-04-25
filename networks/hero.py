@@ -36,6 +36,7 @@ class HERO(torch.nn.Module):
         self.time_used['optimization'] = list()
 
     def forward(self, batch):
+        torch.cuda.synchronize()
         time_all = time()
 
         data = batch['data'].to(self.gpuid)
@@ -43,16 +44,22 @@ class HERO(torch.nn.Module):
         timestamps = batch['timestamps']
         t_ref = batch['t_ref']
 
+        torch.cuda.synchronize()
         time_feature_map_extraction = time()
         detector_scores, weight_scores, desc = self.unet(data)
+        torch.cuda.synchronize()
         time_feature_map_extraction = time() - time_feature_map_extraction
 
+        torch.cuda.synchronize()
         time_keypoint_extraction = time()
         keypoint_coords, keypoint_scores, keypoint_desc = self.keypoint(detector_scores, weight_scores, desc)
+        torch.cuda.synchronize()
         time_keypoint_extraction = time() - time_keypoint_extraction
 
+        torch.cuda.synchronize()
         time_keypoint_matching = time()
         pseudo_coords, match_weights, tgt_ids, src_ids = self.softmax_matcher(keypoint_scores, keypoint_desc, desc, keypoint_coords)
+        torch.cuda.synchronize()
         time_keypoint_matching = time() - time_keypoint_matching
 
         all_keypoint_coords = keypoint_coords
@@ -79,9 +86,11 @@ class HERO(torch.nn.Module):
         t_ref_tgt = torch.index_select(t_ref, 0, tgt_ids.cpu())
         t_ref_src = torch.index_select(t_ref, 0, src_ids.cpu())
         try:
+            torch.cuda.synchronize()
             time_optimization = time()
             R_tgt_src_pred, t_tgt_src_pred = self.solver.optimize(keypoint_coords_xy, pseudo_coords_xy, match_weights,
                                                                 keypoint_ints, time_tgt, time_src, t_ref_tgt, t_ref_src)
+            torch.cuda.synchronize()
             time_optimization = time() - time_optimization
             exception = None
         except Exception as e:
@@ -91,6 +100,7 @@ class HERO(torch.nn.Module):
             t_tgt_src_pred = None
             exception = e
 
+        torch.cuda.synchronize()
         time_all = time() - time_all
 
         if exception is None:
