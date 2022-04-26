@@ -152,9 +152,8 @@ if __name__ == '__main__':
             if out['exception'] is not None:
                 fail_folder = os.path.join(out_folder, 'failed_{}'.format(batchi))
                 os.makedirs(fail_folder, exist_ok=True)
-                if with_visualization:
-                    makedirs_for_visualization(fail_folder)
-                    visualize(batchi, batch, out, config, fail_folder)
+                makedirs_for_visualization(fail_folder)
+                visualize(batchi, batch, out, config, fail_folder)
                 print_used_time(model)
                 raise out['exception']
 
