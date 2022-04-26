@@ -71,9 +71,9 @@ class HERO(torch.nn.Module):
         match_weights_mat = list()
         for i in range(BW):
             tgt_i = i - (i // self.window_size + 1) if i % self.window_size != 0 else None
-            weights_mat1, weights_d = convert_to_weight_matrix(keypoint_scores[i][:].T, tgt_i, self.T_aug if tgt_i else None)
+            weights_mat, weights_d = convert_to_weight_matrix(keypoint_scores[i][:].T, tgt_i, batch.get('T_aug') if tgt_i is not None else None)
             if tgt_i is not None:
-                match_weights_mat.append(weights_mat1)
+                match_weights_mat.append(weights_mat)
             if self.log_det_thres_flag:
                 ids = torch.nonzero(torch.sum(weights_d[:, 0:2], dim=1) > self.log_det_thres_val,
                                     as_tuple=False).squeeze().detach().cpu()
@@ -93,9 +93,7 @@ class HERO(torch.nn.Module):
 
         keypoint_coords_all = keypoint_coords
         keypoint_coords = list()
-        for i in range(BW):
-            if i not in tgt_ids:
-                continue
+        for i in tgt_ids:
             keypoint_coords.append(keypoint_coords_all[i])
 
         pseudo_coords_xy = convert_to_radar_frame(pseudo_coords, self.config)
@@ -106,7 +104,6 @@ class HERO(torch.nn.Module):
             T_aug = torch.stack(batch['T_aug'], dim=0).to(self.gpuid)
             for i in range(len(keypoint_coords_xy)):
                 keypoint_coords_xy[i] = torch.matmul(keypoint_coords_xy[i], T_aug[i, :2, :2].transpose(0, 1))
-            self.solver.T_aug = batch['T_aug']
 
         if self.config['flip_y']:
             for i in range(B * (self.config['window_size'] - 1)):

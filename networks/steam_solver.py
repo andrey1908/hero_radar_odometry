@@ -20,8 +20,6 @@ class SteamSolver():
         self.log_det_thres_val = config['steam']['log_det_thres_val']
         self.log_det_topk = config['steam']['log_det_topk']
         self.dataset = config['dataset']
-        self.T_aug = []
-        self.debug = False
         # pose variables
         self.poses = np.tile(np.expand_dims(np.expand_dims(np.eye(4, dtype=np.float32), 0), 0),
                              (1, self.window_size, 1, 1))  # B x W x 4 x 4
