@@ -139,7 +139,7 @@ if __name__ == '__main__':
         model = UnderTheRadar(config).to(config['gpuid'])
     elif config['model'] == 'HERO':
         model = HERO(config).to(config['gpuid'])
-        model.solver.sliding_flag = True
+        model.solver.sliding_flag = False
 
     checkpoint = torch.load(args.checkpoint, map_location=torch.device(config['gpuid']))
     failed = False
